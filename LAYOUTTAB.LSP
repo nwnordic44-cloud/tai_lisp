@@ -71,8 +71,9 @@
 ;; ===========================================================================
 
 (defun Apply-Layer-State-Universal (targetPattern thawList
-                                    / lyrData lyrName targetName foundTarget
-                                      matchesThaw lyrEnt lyrEntData lyrFlags lyrColor)
+                                    / lyrData lyrName targetName foundTarget xrefName
+                                      matchesThaw lyrEnt lyrEntData lyrFlags lyrColor
+                                      savedRegenauto)
   (princ (strcat "\n[LAYOUTTAB] Engine Init. Target: " targetPattern))
 
   ;; Step 1: Scan all layers to find targetPattern — prefer direct layer over xref-prefixed
@@ -93,6 +94,10 @@
 
   (if foundTarget
     (progn
+      ;; Suppress auto-regen during batch layer changes
+      (setq savedRegenauto (getvar "REGENAUTO"))
+      (setvar "REGENAUTO" 0)
+
       ;; Safety: park CLAYER on layer 0 before modifying any layer states
       (setvar "CLAYER" "0")
 
@@ -153,7 +158,8 @@
         (princ (strcat "\n[LAYOUTTAB] INFO: CLAYER not set — " targetName " is XREF-dependent"))
       )
 
-      ;; Step 4: Regenerate
+      ;; Step 4: Restore auto-regen and do single final regen
+      (setvar "REGENAUTO" savedRegenauto)
       (princ "\n[LAYOUTTAB] CMD: REGENALL")
       (vl-cmdf "REGENALL")
     )
