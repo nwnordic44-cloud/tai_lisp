@@ -73,7 +73,7 @@
 (defun Apply-Layer-State-Universal (targetPattern thawList
                                     / lyrData lyrName targetName foundTarget xrefName
                                       matchesThaw lyrEnt lyrEntData lyrFlags lyrColor
-                                      savedRegenauto)
+                                      newFlags newColor savedRegenauto)
   (princ (strcat "\n[LAYOUTTAB] Engine Init. Target: " targetPattern))
 
   ;; Step 1: Scan all layers to find targetPattern — prefer direct layer over xref-prefixed
@@ -101,9 +101,10 @@
       ;; Safety: park CLAYER on layer 0 before modifying any layer states
       (setvar "CLAYER" "0")
 
-      ;; Step 2: Single-pass entmod loop — freeze or thaw each layer directly
-      ;;   DXF 70 bit 1 (value 1): frozen flag  — logior to set, logand -2 to clear
-      ;;   DXF 62: color number    — negative = layer off, abs() turns it on
+      ;; Step 2: Single-pass entmod loop — on/off semantics only
+      ;;   DXF 62: color number — negative = layer off, abs() turns it on
+      ;;   DXF 70 bit 1: frozen flag — only cleared (thawed) when needed for visibility
+      ;;   Skipping entmod when nothing changes avoids unnecessary regens.
       (setq lyrData (tblnext "LAYER" t))
       (while lyrData
         (setq lyrName (cdr (assoc 2 lyrData)))
@@ -114,31 +115,40 @@
             (setq lyrFlags   (cdr (assoc 70 lyrEntData)))
             (setq lyrColor   (cdr (assoc 62 lyrEntData)))
 
+            (setq matchesThaw nil)
             (if (= (strcase lyrName) (strcase targetName))
-              ;; Target layer: thaw + on
-              (progn
-                (princ (strcat "\n[LAYOUTTAB] TARGET: " lyrName))
-                (setq lyrEntData (subst (cons 70 (logand lyrFlags -2)) (assoc 70 lyrEntData) lyrEntData))
-                (setq lyrEntData (subst (cons 62 (abs lyrColor))       (assoc 62 lyrEntData) lyrEntData))
-                (entmod lyrEntData)
-              )
-              ;; All other layers: thaw+on if in thawList, else freeze
-              (progn
-                (setq matchesThaw nil)
-                (foreach p thawList
-                  (if (wcmatch (strcase lyrName) (strcase p))
-                    (setq matchesThaw t)
-                  )
+              (setq matchesThaw t)
+              (foreach p thawList
+                (if (wcmatch (strcase lyrName) (strcase p))
+                  (setq matchesThaw t)
                 )
-                (if matchesThaw
+              )
+            )
+
+            (if matchesThaw
+              ;; Visible: ensure on (color positive) and thawed (DXF 70 bit 1 clear)
+              (progn
+                (setq newFlags (logand lyrFlags -2))
+                (setq newColor (abs lyrColor))
+                (if (or (/= newFlags lyrFlags) (/= newColor lyrColor))
                   (progn
-                    ;;(princ (strcat "\n[LAYOUTTAB] THAW: " lyrName))
-                    (setq lyrEntData (subst (cons 70 (logand lyrFlags -2)) (assoc 70 lyrEntData) lyrEntData))
-                    (setq lyrEntData (subst (cons 62 (abs lyrColor))       (assoc 62 lyrEntData) lyrEntData))
+                    (if (/= newFlags lyrFlags)
+                      (setq lyrEntData (subst (cons 70 newFlags) (assoc 70 lyrEntData) lyrEntData)))
+                    (if (/= newColor lyrColor)
+                      (setq lyrEntData (subst (cons 62 newColor) (assoc 62 lyrEntData) lyrEntData)))
                     (entmod lyrEntData)
                   )
+                )
+                (if (= (strcase lyrName) (strcase targetName))
+                  (princ (strcat "\n[LAYOUTTAB] TARGET: " lyrName))
+                )
+              )
+              ;; Hidden: turn off via color sign only — never touch freeze flag (no regen)
+              (progn
+                (setq newColor (- (abs lyrColor)))
+                (if (/= newColor lyrColor)
                   (progn
-                    (setq lyrEntData (subst (cons 70 (logior lyrFlags 1)) (assoc 70 lyrEntData) lyrEntData))
+                    (setq lyrEntData (subst (cons 62 newColor) (assoc 62 lyrEntData) lyrEntData))
                     (entmod lyrEntData)
                   )
                 )
