@@ -153,9 +153,13 @@
       )
 
       ;; Step 4: Restore auto-regen and do single final regen
+      ;; vla-Regen runs synchronously and bypasses the command queue —
+      ;; required because vl-cmdf inside a reactor only QUEUES the command
+      ;; for later execution, which is unreliable after ActiveX layer changes.
+      ;; Argument 1 = acAllViewports (regen across model + all layout viewports).
       (setvar "REGENMODE" savedRegenauto)
-      (princ "\n[LAYOUTTAB] CMD: REGENALL")
-      (vl-cmdf "REGENALL")
+      (princ "\n[LAYOUTTAB] CMD: vla-Regen acAllViewports")
+      (vla-Regen acadDoc 1)
     )
     (princ (strcat "\n[LAYOUTTAB] Error: Could not find layer '" targetPattern "'"))
   )
