@@ -71,17 +71,21 @@
                                       matchesThaw lyrEnt lyrEntData lyrFlags lyrColor)
   (princ (strcat "\n[LAYOUTTAB] Engine Init. Target: " targetPattern))
 
-  ;; Step 1: Scan all layers to find targetPattern (supports xref-prefixed layers)
-  (setq foundTarget nil)
+  ;; Step 1: Scan all layers to find targetPattern — prefer direct layer over xref-prefixed
+  (setq foundTarget nil  targetName nil  xrefName nil)
   (setq lyrData (tblnext "LAYER" t))
   (while lyrData
     (setq lyrName (cdr (assoc 2 lyrData)))
-    (if (or (= (strcase lyrName) (strcase targetPattern))
+    (cond
+      ((= (strcase lyrName) (strcase targetPattern))
+       (setq targetName lyrName  foundTarget t))
+      ((and (not targetName)
             (wcmatch (strcase lyrName) (strcat "*|" (strcase targetPattern))))
-      (setq targetName lyrName  foundTarget t)
+       (setq xrefName lyrName  foundTarget t))
     )
     (setq lyrData (tblnext "LAYER"))
   )
+  (if (not targetName) (setq targetName xrefName))
 
   (if foundTarget
     (progn
@@ -136,9 +140,14 @@
         (setq lyrData (tblnext "LAYER"))
       )
 
-      ;; Step 3: Set CLAYER — target is now confirmed thawed by the loop above
-      (princ (strcat "\n[LAYOUTTAB] CMD: setvar CLAYER " targetName))
-      (setvar "CLAYER" targetName)
+      ;; Step 3: Set CLAYER — skip if target is an XREF-dependent layer (contains |)
+      (if (not (vl-string-search "|" targetName))
+        (progn
+          (princ (strcat "\n[LAYOUTTAB] CMD: setvar CLAYER " targetName))
+          (setvar "CLAYER" targetName)
+        )
+        (princ (strcat "\n[LAYOUTTAB] INFO: CLAYER not set — " targetName " is XREF-dependent"))
+      )
 
       ;; Step 4: Regenerate
       (princ "\n[LAYOUTTAB] CMD: REGENALL")
