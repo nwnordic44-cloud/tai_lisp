@@ -127,7 +127,7 @@
                 )
                 (if matchesThaw
                   (progn
-                    ;;(princ (strcat "\n[LAYOUTTAB] THAW: " lyrName))
+                    (princ (strcat "\n[LAYOUTTAB] THAW: " lyrName))
                     (setq lyrEntData (subst (cons 70 (logand lyrFlags -2)) (assoc 70 lyrEntData) lyrEntData))
                     (setq lyrEntData (subst (cons 62 (abs lyrColor))       (assoc 62 lyrEntData) lyrEntData))
                     (entmod lyrEntData)
