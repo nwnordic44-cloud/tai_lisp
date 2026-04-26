@@ -95,8 +95,8 @@
   (if foundTarget
     (progn
       ;; Suppress auto-regen during batch layer changes
-      (setq savedRegenauto (getvar "REGENAUTO"))
-      (setvar "REGENAUTO" 0)
+      (setq savedRegenauto (getvar "REGENMODE"))
+      (setvar "REGENMODE" 0)
 
       ;; Safety: park CLAYER on layer 0 before modifying any layer states
       (setvar "CLAYER" "0")
@@ -159,7 +159,7 @@
       )
 
       ;; Step 4: Restore auto-regen and do single final regen
-      (setvar "REGENAUTO" savedRegenauto)
+      (setvar "REGENMODE" savedRegenauto)
       (princ "\n[LAYOUTTAB] CMD: REGENALL")
       (vl-cmdf "REGENALL")
     )
