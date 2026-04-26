@@ -71,8 +71,9 @@
 ;; ===========================================================================
 
 (defun Apply-Layer-State-Universal (targetPattern thawList
-                                    / lyrData lyrName targetName foundTarget
-                                      matchesThaw lyrEnt lyrEntData lyrFlags lyrColor)
+                                    / lyrData lyrName targetName foundTarget xrefName
+                                      matchesThaw acadDoc layerColl lyr
+                                      savedRegenauto)
   (princ (strcat "\n[LAYOUTTAB] Engine Init. Target: " targetPattern))
 
   ;; Step 1: Scan all layers to find targetPattern — prefer direct layer over xref-prefixed
@@ -93,55 +94,53 @@
 
   (if foundTarget
     (progn
+      ;; Suppress auto-regen during batch layer changes
+      (setq savedRegenauto (getvar "REGENMODE"))
+      (setvar "REGENMODE" 0)
+
       ;; Safety: park CLAYER on layer 0 before modifying any layer states
       (setvar "CLAYER" "0")
 
-      ;; Step 2: Single-pass entmod loop — freeze or thaw each layer directly
-      ;;   DXF 70 bit 1 (value 1): frozen flag  — logior to set, logand -2 to clear
-      ;;   DXF 62: color number    — negative = layer off, abs() turns it on
-      (setq lyrData (tblnext "LAYER" t))
-      (while lyrData
-        (setq lyrName (cdr (assoc 2 lyrData)))
+      ;; Step 2: ActiveX layer state — vla-* methods don't trigger per-call regens
+      ;;   vla-put-LayerOn: turns layer on/off (display only, no regen)
+      ;;   vla-put-Freeze:  thaws frozen layers when they need to become visible
+      (setq acadDoc   (vla-get-ActiveDocument (vlax-get-acad-object)))
+      (setq layerColl (vla-get-Layers acadDoc))
+
+      (vlax-for lyr layerColl
+        (setq lyrName (vla-get-Name lyr))
         (if (not (member (strcase lyrName) (list "0" "DEFPOINTS")))
           (progn
-            (setq lyrEnt     (tblobjname "LAYER" lyrName))
-            (setq lyrEntData (entget lyrEnt))
-            (setq lyrFlags   (cdr (assoc 70 lyrEntData)))
-            (setq lyrColor   (cdr (assoc 62 lyrEntData)))
-
+            (setq matchesThaw nil)
             (if (= (strcase lyrName) (strcase targetName))
-              ;; Target layer: thaw + on
-              (progn
-                (princ (strcat "\n[LAYOUTTAB] TARGET: " lyrName))
-                (setq lyrEntData (subst (cons 70 (logand lyrFlags -2)) (assoc 70 lyrEntData) lyrEntData))
-                (setq lyrEntData (subst (cons 62 (abs lyrColor))       (assoc 62 lyrEntData) lyrEntData))
-                (entmod lyrEntData)
-              )
-              ;; All other layers: thaw+on if in thawList, else freeze
-              (progn
-                (setq matchesThaw nil)
-                (foreach p thawList
-                  (if (wcmatch (strcase lyrName) (strcase p))
-                    (setq matchesThaw t)
-                  )
-                )
-                (if matchesThaw
-                  (progn
-                    (princ (strcat "\n[LAYOUTTAB] THAW: " lyrName))
-                    (setq lyrEntData (subst (cons 70 (logand lyrFlags -2)) (assoc 70 lyrEntData) lyrEntData))
-                    (setq lyrEntData (subst (cons 62 (abs lyrColor))       (assoc 62 lyrEntData) lyrEntData))
-                    (entmod lyrEntData)
-                  )
-                  (progn
-                    (setq lyrEntData (subst (cons 70 (logior lyrFlags 1)) (assoc 70 lyrEntData) lyrEntData))
-                    (entmod lyrEntData)
-                  )
+              (setq matchesThaw t)
+              (foreach p thawList
+                (if (wcmatch (strcase lyrName) (strcase p))
+                  (setq matchesThaw t)
                 )
               )
             )
+
+            (vl-catch-all-apply
+              '(lambda ()
+                 (if matchesThaw
+                   (progn
+                     (if (= (vla-get-Freeze lyr) :vlax-true)
+                       (vla-put-Freeze lyr :vlax-false))
+                     (if (= (vla-get-LayerOn lyr) :vlax-false)
+                       (vla-put-LayerOn lyr :vlax-true))
+                   )
+                   (if (= (vla-get-LayerOn lyr) :vlax-true)
+                     (vla-put-LayerOn lyr :vlax-false))
+                 )
+               )
+            )
+
+            (if (and matchesThaw (= (strcase lyrName) (strcase targetName)))
+              (princ (strcat "\n[LAYOUTTAB] TARGET: " lyrName))
+            )
           )
         )
-        (setq lyrData (tblnext "LAYER"))
       )
 
       ;; Step 3: Set CLAYER — skip if target is an XREF-dependent layer (contains |)
@@ -153,7 +152,8 @@
         (princ (strcat "\n[LAYOUTTAB] INFO: CLAYER not set — " targetName " is XREF-dependent"))
       )
 
-      ;; Step 4: Regenerate
+      ;; Step 4: Restore auto-regen and do single final regen
+      (setvar "REGENMODE" savedRegenauto)
       (princ "\n[LAYOUTTAB] CMD: REGENALL")
       (vl-cmdf "REGENALL")
     )

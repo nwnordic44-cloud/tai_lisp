@@ -1,4 +1,4 @@
-;; LAYOUTTAB.LSP v1.0
+;; LAYOUTTAB.LSP v1.0.2
 ;; Purpose: Detects layout tab switch and calls matching layer macros.
 
 (vl-load-com)
@@ -177,5 +177,5 @@
   )
 )
 
-(princ "\nLAYOUTTAB (v1.0) Loaded. Ready for Floor Plan switch.")
+(princ "\nLAYOUTTAB (v1.0.2) Loaded. Ready for Floor Plan switch.")
 (princ)
