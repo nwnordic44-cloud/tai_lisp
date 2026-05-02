@@ -198,6 +198,6 @@
     "1st-RCP-cont4"
     '("0" "0-NONZ-*" "0_BDR2TTL" "0_ARTAG_PS" "0_PS_ARTAG" "0_PS_NOTES" "0_PS_SCHED" "0_PS_REV*" "0_NONPLOT" "1st-titl-*" "1st-com1-*" "1st-RCP-*" "1st-flr-argrid" "1st-lght-*" "1st-rcp-arCLGTXT")
 )
-
+)
 (princ "\nLAYOUTTAB (v1.0.3) Loaded. Ready for Floor Plan switch.")
 (princ)
