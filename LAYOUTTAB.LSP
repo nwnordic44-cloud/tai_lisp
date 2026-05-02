@@ -1,4 +1,4 @@
-;; LAYOUTTAB.LSP v1.0.2
+;; LAYOUTTAB.LSP v1.0.3
 ;; Purpose: Detects layout tab switch and calls matching layer macros.
 
 (vl-load-com)
@@ -181,5 +181,23 @@
   )
 )
 
-(princ "\nLAYOUTTAB (v1.0.2) Loaded. Ready for Floor Plan switch.")
+;; Tab: A-114 1st-EqpT_FMMISC
+(defun L_A1141STEQPT_FMMISC ()
+  (Apply-Layer-State-Universal
+    "1st-EqpT-cont4"
+    '("0"          "0-NONZ-*"
+      "0_BDR2TTL"  "0_ARTAG_PS"
+      "0_PS_ARTAG" "0_PS_NOTES" "0_PS_SCHED" "0_PS_REV*" "0_NONPLOT"
+      "1st-titl-*" "1st-Com1-*" "1st-EqpT-*" "1st-flr-argrid" "1st-FLR-FM*")
+  )
+)
+
+;; Tab: A-112 RCP
+(defun L_A112RCP ()
+  (Apply-Layer-State-Universal
+    "1st-RCP-cont4"
+    '("0" "0-NONZ-*" "0_BDR2TTL" "0_ARTAG_PS" "0_PS_ARTAG" "0_PS_NOTES" "0_PS_SCHED" "0_PS_REV*" "0_NONPLOT" "1st-titl-*" "1st-com1-*" "1st-RCP-*" "1st-flr-argrid" "1st-lght-*" "1st-rcp-arCLGTXT")
+)
+
+(princ "\nLAYOUTTAB (v1.0.3) Loaded. Ready for Floor Plan switch.")
 (princ)
