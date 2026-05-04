@@ -1,5 +1,6 @@
-;; LAYOUTTAB.LSP v1.0.3
+;; LAYOUTTAB2.LSP v2.0.0
 ;; Purpose: Detects layout tab switch and calls matching layer macros.
+;;          Tries sheet-number macros first, then full-tab-name macros.
 
 (vl-load-com)
 
@@ -14,28 +15,55 @@
   str
 )
 
+(defun KP-Clean-Name (name / clean_name)
+  (setq clean_name (vl-string-trim " " (strcase name)))
+  (setq clean_name (String-Replace-All "-" "" clean_name))
+  (setq clean_name (String-Replace-All " " "" clean_name))
+  (setq clean_name (String-Replace-All "." "" clean_name))
+  clean_name
+)
+
+(defun KP-Get-Sheet-Number (layout_name / trimmed spacePos)
+  (setq trimmed (vl-string-trim " " layout_name))
+  (setq spacePos (vl-string-search " " trimmed))
+  (if spacePos
+    (substr trimmed 1 spacePos)
+    trimmed
+  )
+)
+
+(defun KP-Try-Macro (macro_func_name / cmdFunc result)
+  (setq cmdFunc (eval (read macro_func_name)))
+  (if (and cmdFunc (or (= (type cmdFunc) 'SUBR) (= (type cmdFunc) 'USUBR)))
+    (progn
+      (princ (strcat "\n[LAYOUTTAB2] Triggering: " macro_func_name))
+      (princ "\n[LAYOUTTAB2] Running Macro...")
+      (setq result (vl-catch-all-apply 'cmdFunc nil))
+      (if (vl-catch-all-error-p result)
+        (princ (strcat "\n[LAYOUTTAB2] ERROR: " (vl-catch-all-error-message result)))
+      )
+      t
+    )
+    nil
+  )
+)
+
 (if (not *KP-RUNNING*) (setq *KP-RUNNING* nil))
 
-(defun KP-CORE (layout_name / clean_name macro_func_name cmdFunc result)
+(defun KP-CORE (layout_name / sheet_name sheet_macro_name full_macro_name ranMacro)
   (if (and (not *KP-RUNNING*) layout_name (/= layout_name ""))
     (progn
       (setq *KP-RUNNING* t)
-      (setq clean_name (vl-string-trim " " (strcase layout_name)))
-      (setq clean_name (String-Replace-All "-" "" clean_name))
-      (setq clean_name (String-Replace-All " " "" clean_name))
-      (setq clean_name (String-Replace-All "." "" clean_name))
-      (setq macro_func_name (strcat "L_" clean_name))
-      (princ (strcat "\n[LAYOUTTAB] Tab: " layout_name " -> Triggering: " macro_func_name))
-      (setq cmdFunc (eval (read macro_func_name)))
-      (if (and cmdFunc (or (= (type cmdFunc) 'SUBR) (= (type cmdFunc) 'USUBR)))
-        (progn
-          (princ "\n[LAYOUTTAB] Running Macro...")
-          (setq result (vl-catch-all-apply 'cmdFunc nil))
-          (if (vl-catch-all-error-p result)
-            (princ (strcat "\n[LAYOUTTAB] ERROR: " (vl-catch-all-error-message result)))
-          )
-        )
-        (princ (strcat "\n[LAYOUTTAB] No LISP function defined for " macro_func_name))
+      (setq sheet_name (KP-Get-Sheet-Number layout_name))
+      (setq sheet_macro_name (strcat "L_" (KP-Clean-Name sheet_name)))
+      (setq full_macro_name (strcat "L_" (KP-Clean-Name layout_name)))
+      (princ (strcat "\n[LAYOUTTAB2] Tab: " layout_name " -> Sheet: " sheet_name))
+      (setq ranMacro (KP-Try-Macro sheet_macro_name))
+      (if (not ranMacro)
+        (setq ranMacro (KP-Try-Macro full_macro_name))
+      )
+      (if (not ranMacro)
+        (princ (strcat "\n[LAYOUTTAB2] No LISP function defined for " sheet_macro_name " or " full_macro_name))
       )
       (setq *KP-RUNNING* nil)
     )
@@ -171,6 +199,10 @@
 ;; ===========================================================================
 
 ;; Tab: A-110 FLOOR PLAN
+(defun L_A110 ()
+  (L_A110FLOORPLAN)
+)
+
 (defun L_A110FLOORPLAN ()
   (Apply-Layer-State-Universal
     "1st-flr-cont4"
@@ -181,7 +213,32 @@
   )
 )
 
+;; Tab: A-110D DIM
+(defun L_A110D ()
+  (L_A110DDIM)
+)
+
+(defun L_A110DDIM (/ acadDoc layerColl lyr)
+  (Apply-Layer-State-Universal
+    "1st-DIM-DIM"
+    '("0"          "0-NONZ-*"
+      "0_BDR2TTL"  "0_ARTAG_PS"
+      "0_PS_ARTAG" "0_PS_NOTES" "0_PS_SCHED" "0_PS_REV*" "0_NONPLOT"
+      "1st-titl-*" "1st-Com1-*" "1st-DIM-*" "1st-flr-argrid")
+  )
+  (setq acadDoc   (vla-get-ActiveDocument (vlax-get-acad-object)))
+  (setq layerColl (vla-get-Layers acadDoc))
+  (setq lyr (vl-catch-all-apply 'vla-Item (list layerColl "1st-DIM-DIM")))
+  (if (not (vl-catch-all-error-p lyr))
+    (vl-catch-all-apply 'vla-put-Color (list lyr 13))
+  )
+)
+
 ;; Tab: A-114 1st-EqpT_FMMISC
+(defun L_A114 ()
+  (L_A1141STEQPT_FMMISC)
+)
+
 (defun L_A1141STEQPT_FMMISC ()
   (Apply-Layer-State-Universal
     "1st-EqpT-cont4"
@@ -193,11 +250,16 @@
 )
 
 ;; Tab: A-112 RCP
+(defun L_A112 ()
+  (L_A112RCP)
+)
+
 (defun L_A112RCP ()
   (Apply-Layer-State-Universal
     "1st-RCP-cont4"
     '("0" "0-NONZ-*" "0_BDR2TTL" "0_ARTAG_PS" "0_PS_ARTAG" "0_PS_NOTES" "0_PS_SCHED" "0_PS_REV*" "0_NONPLOT" "1st-titl-*" "1st-com1-*" "1st-RCP-*" "1st-flr-argrid" "1st-lght-*" "1st-rcp-arCLGTXT")
 )
 )
-(princ "\nLAYOUTTAB (v1.0.3) Loaded. Ready for Floor Plan switch.")
+
+(princ "\nLAYOUTTAB2 (v2.0.0) Loaded. Ready for sheet-number tab switching.")
 (princ)
